@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+#
+# script_aula.sh - My shell script class code
+#
+# Author:        Edimilson Santos Pereira Junior
+# Maintainer:   Edimilson Santos Pereira Junior
+#
+# ------------------------------------------------------------------------ #
+# WHAT IT DOES?
+# This script can be a workstation setup script for a Ubuntu Linux server system.
+#
+# CONFIGURATION?
+# No configuration is needed, but you can change the variables at the top of the script to suit your needs.
+#
+# HOW TO USE IT?
+# Examples:
+# $ ./script_aula
+#
+# or
+#
+# 30 21 * * * root script_aula 1> /dev/null 2>&1
+# ------------------------------------------------------------------------ #
+# Changelog:
+#
+#   v:
+#     - First version with comments!
+#
+# ------------------------------------------------------------------------ #
+# Tested on:
+#   bash 5.2.15(1)-release
+#   Ubuntu 22.04 LTS
+# ------------------------------------------------------------------------ #
+
+#-------------------------------------VARIABLES-------------------------------------#
+PPA_PIPER_LIBRATBAG="ppa:libraqtbq-piper/piper-libraqtbq-git"
+PPA_PIPER_LUTRIS="ppa:lutris-team/Lutris"
+PROGRAMAS_PARA_INSTALAR_DEB=(
+    https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+    https://github.com/Automattic/simplenote-electron/releases/download/v1.8.0/Simplenote-linux-1.8.0-amd64.deb
+)
+DIRETORIO_DOWNLOAD_PROGRAMAS="$HOME/Downloads/programas"
+PROGRAMAS_PARA_INSTALAR=(
+    snapd
+    winff
+    guvcview
+    virtualbox
+    piper
+    lutris
+)
+PROGRAMAS_PARA_INSTALAR_SNAP=(
+    nvim
+    spotify
+    postman
+)
+INF="Info:"
+ERR="Erro:"
+
+#-------------------------------------ERRORs HANDLED-------------------------------------#
+if ! ping -c 1 8.8.8.8 -q &> /dev/null; then
+    echo "$ERR Sem conexão com a internet. Verifique sua conexão e tente novamente."
+    exit 1
+else
+    echo "$INF Conexão com a internet estabelecida com sucesso."
+fi
+
+if [[ ! -x 'which wget' ]]; then
+    echo "$ERR O comando 'wget' não está instalado. Instalando..."
+    sudo apt install wget -y &> /dev/null
+else
+    echo "$INF O comando 'wget' já está instalado."
+fi
+
+#-------------------------------------FUNCTIONS DEFINITION-------------------------------------#
+remover_locks() {
+    echo "$INF Removendo locks do apt..."
+    sudo rm /var/lib/dpkg/lock
+    sudo rm /var/lib/dpkg/lock-frontend
+    sudo rm /var/cache/apt/archives/lock
+}
+adicionar_arquitetura_i386() {
+    echo "$INF Adicionando arquitetura i386..."
+    sudo dpkg --add-architecture i386 &> /dev/null
+}
+atualizar_repositorios() {
+    echo "$INF Atualizando repositórios..."
+    sudo apt update -y &> /dev/null
+    sudo apt upgrade -y &> /dev/null
+}
+adicionar_ppas() {
+    echo "$INF Adicionando PPAs..."
+    sudo apt install software-properties-common -y &> /dev/null
+    sudo apt-add-repository "$PPA_PIPER_LIBRATBAG" -y &> /dev/null
+    sudo add-apt-repository "$PPA_PIPER_LUTRIS" -y &> /dev/null
+}
+baixar_pacotes_debs() {
+    echo "$INF Baixando pacotes .deb..."
+    if [[ ! -d "$DIRETORIO_DOWNLOAD_PROGRAMAS" ]]; then
+        echo "Diretório $DIRETORIO_DOWNLOAD_PROGRAMAS não existe. Criando..."
+        mkdir -p "$DIRETORIO_DOWNLOAD_PROGRAMAS"
+    else
+        echo "$INF Diretório $DIRETORIO_DOWNLOAD_PROGRAMAS já existe."
+    fi
+
+    for url in ${PROGRAMAS_PARA_INSTALAR_DEB[@]}; do
+        echo "$INF Baixando $url..."
+        wget -c "$url" -p "$DIRETORIO_DOWNLOAD_PROGRAMAS" &> /dev/null
+    done
+}
+instalar_pacotes_debs() {
+    baixar_pacotes_debs
+    echo "$INF Instalando pacotes .deb..."
+    sudo dpkg -i $DIRETORIO_DOWNLOAD_PROGRAMAS/*.deb &> /dev/null
+    sudo apt -f install -y &> /dev/null
+    echo "$INF Pacotes .deb instalados com sucesso."
+}
+instalar_pacotes_apt() {
+    echo "$INF Instalando pacotes apt..."
+    for pacote in ${PROGRAMAS_PARA_INSTALAR[@]}; do
+        if ! dpkg -l | grep -q "$pacote"; then
+            echo "$INF Instalando $pacote..."
+            sudo apt install -y "$pacote" &> /dev/null
+        else
+            echo "$INF O programa $pacote já está instalado."
+            continue
+        fi
+    done
+}
+instalar_pacotes_snap() {
+    echo "$INF Instalando pacotes snap..."
+    for pacote_snap in ${PROGRAMAS_PARA_INSTALAR_SNAP[@]}
+    do
+        if ! snap list | grep -q "$pacote_snap"; then
+            echo "$INF Instalando $pacote_snap..."
+            sudo snap install "$pacote_snap" --classic &> /dev/null
+        else
+            echo "$INF O programa snap $pacote_snap já está instalado"
+        fi
+    done
+}
+auto_limpar() {
+    echo "$INF Limpando pacotes desnecessários..."
+    sudo apt autoclean &> /dev/null
+    sudo apt autoremove -y &> /dev/null
+    echo "$INF Limpeza concluída."
+}
+
+#-------------------------------------MAIN FUNCTION-------------------------------------#
+main() {
+    echo "$INF Iniciando o script de instalação..."
+    remover_locks
+    adicionar_arquitetura_i386
+    atualizar_repositorios
+    adicionar_ppas
+    atualizar_repositorios
+    instalar_pacotes_debs
+    instalar_pacotes_apt
+    instalar_pacotes_snap
+    atualizar_repositorios
+    auto_limpar
+    echo "$INF Script de instalação concluído com sucesso. Reinicie o computador para aplicar as alterações."
+}
+
+main
